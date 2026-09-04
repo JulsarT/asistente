@@ -72,8 +72,7 @@ async function startApp() {
     requestNotificationPermission();
     updateClock();
     setInterval(updateClock, 1000);
-    setInterval(checkAlarms, 15000);
-    setInterval(checkAlarms, 30000);
+    setInterval(checkAlarms, 5000);
     setInterval(loadTasks, 60000);
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
@@ -289,12 +288,14 @@ function renderTasks() {
       const disabledClass = task.enabled ? '' : 'disabled';
       const toggleClass = task.enabled ? 'active' : 'inactive';
       const toggleIcon = task.enabled ? '✅' : '⏸️';
+      const completedClass = isDismissed(task.id) ? 'completed' : '';
+      const completedBadge = isDismissed(task.id) ? '<span class="completed-badge">✅ HECHA</span>' : '';
 
       html += `
-        <div class="task-item ${disabledClass}">
+        <div class="task-item ${disabledClass} ${completedClass}">
           <div class="task-time">${formatTime(task.task_time)}</div>
           <div class="task-info">
-            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-title">${escapeHtml(task.title)} ${completedBadge}</div>
             ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
             <div class="task-days">${dayBadges}</div>
           </div>
@@ -368,7 +369,7 @@ function renderReminders() {
 // ============================================
 function checkAlarms() {
   const now = new Date();
-  const currentMinute = now.getHours() * 60 + now.getMinutes();
+  const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
   const today = getDayName(now);
   const todayKey = now.toISOString().split('T')[0];
 
@@ -381,9 +382,10 @@ function checkAlarms() {
     if (todayTriggered.includes(task.id)) return;
 
     const [h, m] = task.task_time.split(':').map(Number);
-    const taskMinute = h * 60 + m;
+    const taskSeconds = h * 3600 + m * 60;
+    const diff = taskSeconds - currentSeconds;
 
-    if (currentMinute - taskMinute >= 0 && currentMinute - taskMinute <= 2) {
+    if (diff >= 0 && diff <= 15) {
       triggerAlarm(task);
       if (!triggered[todayKey]) triggered[todayKey] = [];
       triggered[todayKey].push(task.id);

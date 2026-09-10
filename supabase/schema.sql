@@ -11,8 +11,31 @@ CREATE TABLE IF NOT EXISTS tasks (
   task_time TIME NOT NULL,
   days TEXT[] NOT NULL DEFAULT ARRAY['lunes','martes','miercoles','jueves','viernes','sabado','domingo'],
   enabled BOOLEAN DEFAULT true,
+  depends_on UUID,
+  depends_on_step UUID,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ============================================
+-- TABLA DE PASOS (sub-tareas dentro de una tarea)
+-- ============================================
+CREATE TABLE IF NOT EXISTS task_steps (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  done BOOLEAN DEFAULT false,
+  position INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE task_steps ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all access steps" ON task_steps;
+
+CREATE POLICY "Allow all access steps" ON task_steps
+  FOR ALL
+  USING (true)
+  WITH CHECK (true);
 
 -- Permitir acceso publico (sin auth)
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;

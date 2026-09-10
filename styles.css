@@ -574,6 +574,169 @@ body {
   letter-spacing: 0.5px;
 }
 
+.dep-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-purple);
+  background: rgba(168, 85, 247, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+  cursor: help;
+}
+
+/* INLINE STEPS (en la tarjeta de la tarea) */
+.inline-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+
+.inline-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: color var(--transition);
+}
+
+.inline-step:hover {
+  color: var(--text-primary);
+}
+
+.inline-step input {
+  display: none;
+}
+
+.inline-step .step-check {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-light);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: white;
+  flex-shrink: 0;
+  transition: all var(--transition);
+}
+
+.inline-step input:checked + .step-check {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.inline-step.done {
+  color: var(--accent-green);
+  text-decoration: line-through;
+}
+
+/* MODAL - DEPENDS */
+.depends-row select,
+.depends-step-wrap select {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.depends-row select:focus,
+.depends-step-wrap select:focus {
+  border-color: var(--accent-blue);
+}
+
+.depends-step-wrap {
+  margin-top: 8px;
+}
+
+.depends-step-wrap label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+/* MODAL - STEPS EDITOR */
+.steps-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.steps-add-row input {
+  flex: 1;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.steps-add-row input:focus {
+  border-color: var(--accent-blue);
+}
+
+.modal-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.modal-step-num {
+  width: 22px;
+  height: 22px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--accent-blue);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.modal-step-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.modal-step-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.btn-step-del {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.btn-step-del:hover {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+}
+
 .task-time {
   font-size: 20px;
   font-weight: 700;
@@ -876,6 +1039,12 @@ body {
 .form-group textarea:focus,
 .form-group select:focus {
   border-color: var(--accent-blue);
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
 }
 
 .form-group select {

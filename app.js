@@ -3,6 +3,7 @@
 // ============================================
 let supabaseClient = null;
 let tasks = [];
+let steps = [];
 let currentFilter = 'all';
 let deleteTargetId = null;
 let audioContext = null;
@@ -10,6 +11,7 @@ let soundEnabled = false;
 let volume = 0.7;
 let currentAlarmTask = null;
 let snoozeTimers = {};
+let isStepEditing = false;
 
 // ============================================
 // INICIALIZACION
@@ -69,11 +71,13 @@ async function startApp() {
   try {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     await loadTasks();
+    await loadSteps();
     requestNotificationPermission();
     updateClock();
     setInterval(updateClock, 1000);
     setInterval(checkAlarms, 5000);
-    setInterval(loadTasks, 60000);
+    setInterval(loadTasks, 30000);
+    setInterval(loadSteps, 30000);
     document.getElementById('setup-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     updateDashboard();
@@ -144,6 +148,142 @@ async function loadTasks() {
     console.error('Error cargando tareas:', err);
     showToast('Error al cargar tareas', 'error');
   }
+}
+
+// ============================================
+// BASE DE DATOS - PASOS
+// ============================================
+async function loadSteps() {
+  if (!supabaseClient) return;
+  try {
+    const { data, error } = await supabaseClient
+      .from('task_steps')
+      .select('*')
+      .order('position');
+
+    if (error) throw error;
+    steps = data || [];
+    renderTasks();
+    renderReminders();
+  } catch (err) {
+    console.error('Error cargando pasos:', err);
+  }
+}
+
+function getStepsForTask(taskId) {
+  return steps.filter(s => s.task_id === taskId).sort((a, b) => a.position - b.position);
+}
+
+async function createStep(taskId, text) {
+  const position = getStepsForTask(taskId).length;
+  try {
+    const { data, error } = await supabaseClient
+      .from('task_steps')
+      .insert([{ task_id: taskId, text, position, done: false }])
+      .select();
+
+    if (error) throw error;
+    steps.push(data[0]);
+    return data[0];
+  } catch (err) {
+    console.error('Error creando paso:', err);
+    showToast('Error al crear paso', 'error');
+    return null;
+  }
+}
+
+async function updateStepText(stepId, text) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('task_steps')
+      .update({ text })
+      .eq('id', stepId)
+      .select();
+
+    if (error) throw error;
+    const idx = steps.findIndex(s => s.id === stepId);
+    if (idx !== -1) steps[idx] = data[0];
+    return data[0];
+  } catch (err) {
+    console.error('Error actualizando paso:', err);
+    showToast('Error al actualizar paso', 'error');
+    return null;
+  }
+}
+
+async function deleteStep(stepId) {
+  try {
+    const { error } = await supabaseClient
+      .from('task_steps')
+      .delete()
+      .eq('id', stepId);
+
+    if (error) throw error;
+    steps = steps.filter(s => s.id !== stepId);
+    showToast('Paso eliminado', 'success');
+    return true;
+  } catch (err) {
+    console.error('Error eliminando paso:', err);
+    showToast('Error al eliminar paso', 'error');
+    return false;
+  }
+}
+
+async function toggleStep(stepId, done) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('task_steps')
+      .update({ done })
+      .eq('id', stepId)
+      .select();
+
+    if (error) throw error;
+    const idx = steps.findIndex(s => s.id === stepId);
+    if (idx !== -1) steps[idx] = data[0];
+
+    // Liberar hijas que dependen de este paso
+    if (done) releaseStepDependents(stepId);
+
+    renderTasks();
+    renderReminders();
+    return data[0];
+  } catch (err) {
+    console.error('Error actualizando paso:', err);
+    showToast('Error al actualizar paso', 'error');
+    return null;
+  }
+}
+
+function releaseStepDependents(stepId) {
+  const todayKey = new Date().toISOString().split('T')[0];
+  const triggered = getTriggeredTasks();
+  if (!triggered[todayKey]) triggered[todayKey] = [];
+
+  tasks.filter(t => t.depends_on_step === stepId && t.enabled).forEach(child => {
+    if (triggered[todayKey].includes(child.id)) return;
+    triggerAlarm(child);
+    triggered[todayKey].push(child.id);
+  });
+
+  if (tasks.some(t => t.depends_on_step === stepId)) saveTriggeredTasks(triggered);
+}
+
+// ¿Una tarea esta "bloqueada" por su dependencia (madre no hecha o paso no hecho)?
+function isTaskBlocked(task) {
+  if (!task.depends_on && !task.depends_on_step) return false;
+
+  // Libera por paso especifico
+  if (task.depends_on_step) {
+    const step = steps.find(s => s.id === task.depends_on_step);
+    return !step || !step.done;
+  }
+
+  // Libera al terminar la madre
+  if (task.depends_on) {
+    return !isDismissed(task.depends_on);
+  }
+
+  return false;
 }
 
 async function createTask(taskData) {
@@ -290,13 +430,30 @@ function renderTasks() {
       const toggleIcon = task.enabled ? '✅' : '⏸️';
       const completedClass = isDismissed(task.id) ? 'completed' : '';
       const completedBadge = isDismissed(task.id) ? '<span class="completed-badge">✅ HECHA</span>' : '';
+      const depTask = task.depends_on ? tasks.find(t => t.id === task.depends_on) : null;
+      const depStep = task.depends_on_step ? steps.find(s => s.id === task.depends_on_step) : null;
+      const depLabel = depStep ? (depStep.text || 'paso') : (depTask ? depTask.title : null);
+      const depBadge = (depTask || depStep) ? `<span class="dep-badge" title="Espera: ${escapeHtml(depLabel)}">🔗 ${escapeHtml(depLabel)}${isTaskBlocked(task) ? ' ⏳' : ''}</span>` : '';
+
+      const taskSteps = getStepsForTask(task.id);
+      const stepsHtml = taskSteps.length > 0 ? `
+        <div class="inline-steps">
+          ${taskSteps.map(s => `
+            <label class="inline-step${s.done ? ' done' : ''}">
+              <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleStep('${s.id}', this.checked)">
+              <span class="step-check">${s.done ? '✔' : ''}</span>
+              ${escapeHtml(s.text)}
+            </label>
+          `).join('')}
+        </div>` : '';
 
       html += `
         <div class="task-item ${disabledClass} ${completedClass}">
           <div class="task-time">${formatTime(task.task_time)}</div>
           <div class="task-info">
-            <div class="task-title">${escapeHtml(task.title)} ${completedBadge}</div>
+            <div class="task-title">${escapeHtml(task.title)} ${completedBadge} ${depBadge}</div>
             ${task.description ? `<div class="task-desc">${escapeHtml(task.description)}</div>` : ''}
+            ${stepsHtml}
             <div class="task-days">${dayBadges}</div>
           </div>
           <div class="task-actions">
@@ -381,6 +538,9 @@ function checkAlarms() {
     if (!task.days.includes(today)) return;
     if (todayTriggered.includes(task.id)) return;
 
+    // Si la tarea esta bloqueada por dependencia (madre o paso), no suena
+    if (isTaskBlocked(task)) return;
+
     const [h, m] = task.task_time.split(':').map(Number);
     const taskSeconds = h * 3600 + m * 60;
     const diff = taskSeconds - currentSeconds;
@@ -462,6 +622,22 @@ function snoozeAlarm() {
 // ============================================
 function dismissReminder(taskId) {
   markDismissed(taskId);
+  renderReminders();
+  updateDashboard();
+
+  // Si esta tarea era la "madre" de otras, disparar las hijas que dependen de ella
+  const todayKey = new Date().toISOString().split('T')[0];
+  const triggered = getTriggeredTasks();
+  if (!triggered[todayKey]) triggered[todayKey] = [];
+
+  tasks.filter(t => t.depends_on === taskId && t.enabled).forEach(child => {
+    if (triggered[todayKey].includes(child.id)) return;
+    triggerAlarm(child);
+    triggered[todayKey].push(child.id);
+  });
+
+  if (tasks.some(t => t.depends_on === taskId)) saveTriggeredTasks(triggered);
+
   renderReminders();
   updateDashboard();
 }
@@ -635,10 +811,27 @@ function openTaskModal(taskId) {
   const form = document.getElementById('task-form');
   form.reset();
 
-  document.getElementById('task-id').value = '';
+  const currentTaskId = taskId || '';
+  document.getElementById('task-id').value = currentTaskId;
   document.getElementById('task-enabled').checked = true;
 
   document.querySelectorAll('.day-checkbox input').forEach(cb => cb.checked = true);
+
+  // Poblar lista de dependencias (excluye la tarea misma)
+  const dependsSelect = document.getElementById('task-depends');
+  dependsSelect.innerHTML = '<option value="">— Ninguna —</option>';
+  tasks
+    .filter(t => t.id !== currentTaskId)
+    .forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${formatTime(t.task_time)} - ${t.title}`;
+      dependsSelect.appendChild(opt);
+    });
+
+  // Ocultar selector de paso hasta que elijan madre
+  document.getElementById('depends-step-wrap').style.display = 'none';
+  document.getElementById('task-depends-step').innerHTML = '<option value="">— Al terminar la madre —</option>';
 
   if (taskId) {
     const task = tasks.find(t => t.id === taskId);
@@ -650,6 +843,13 @@ function openTaskModal(taskId) {
       document.getElementById('task-shift').value = task.shift;
       document.getElementById('task-time').value = task.task_time.substring(0, 5);
       document.getElementById('task-enabled').checked = task.enabled;
+      document.getElementById('task-depends').value = task.depends_on || '';
+      document.getElementById('task-depends-step').value = task.depends_on_step || '';
+
+      if (task.depends_on) {
+        document.getElementById('depends-step-wrap').style.display = 'block';
+        populateStepSelector(task.depends_on, task.depends_on_step);
+      }
 
       document.querySelectorAll('.day-checkbox input').forEach(cb => {
         cb.checked = task.days.includes(cb.value);
@@ -659,7 +859,88 @@ function openTaskModal(taskId) {
     document.getElementById('modal-title').textContent = 'Nueva Tarea';
   }
 
+  renderStepsEditor(currentTaskId);
   modal.style.display = 'flex';
+}
+
+function updateStepSelector() {
+  const parentId = document.getElementById('task-depends').value;
+  const wrap = document.getElementById('depends-step-wrap');
+  if (parentId) {
+    wrap.style.display = 'block';
+    populateStepSelector(parentId, '');
+  } else {
+    wrap.style.display = 'none';
+    document.getElementById('task-depends-step').innerHTML = '<option value="">— Al terminar la madre —</option>';
+    document.getElementById('task-depends-step').value = '';
+  }
+}
+
+function populateStepSelector(parentId, selectedStep) {
+  const stepSelect = document.getElementById('task-depends-step');
+  const parentSteps = getStepsForTask(parentId);
+  stepSelect.innerHTML = '<option value="">— Al terminar la madre —</option>';
+  parentSteps.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `Paso ${s.position + 1}: ${s.text}`;
+    stepSelect.appendChild(opt);
+  });
+  stepSelect.value = selectedStep || '';
+}
+
+function renderStepsEditor(taskId) {
+  const container = document.getElementById('steps-editor');
+  const hint = document.getElementById('steps-empty-hint');
+  const taskSteps = taskId ? getStepsForTask(taskId) : [];
+
+  if (taskSteps.length === 0) {
+    hint.style.display = 'block';
+    container.textContent = '';
+    return;
+  }
+
+  hint.style.display = 'none';
+  container.innerHTML = taskSteps.map(s => `
+    <div class="modal-step-item">
+      <span class="modal-step-num">${s.position + 1}</span>
+      <input type="text" class="modal-step-input" value="${escapeHtml(s.text)}" maxlength="120" data-step-id="${s.id}" onchange="renameStepFromModal('${s.id}', this.value)">
+      <button type="button" class="btn-small btn-step-del" onclick="removeStepFromModal('${s.id}')">✕</button>
+    </div>
+  `).join('');
+}
+
+function addStepFromModal() {
+  const taskId = document.getElementById('task-id').value;
+  const input = document.getElementById('new-step-input');
+  const text = input.value.trim();
+  if (!taskId) {
+    showToast('Guarda la tarea primero para agregar pasos', 'error');
+    return;
+  }
+  if (!text) {
+    showToast('Escribe el texto del paso', 'error');
+    return;
+  }
+  createStep(taskId, text).then(() => {
+    input.value = '';
+    renderStepsEditor(taskId);
+    updateStepSelector();
+  });
+}
+
+async function renameStepFromModal(stepId, value) {
+  const text = value.trim();
+  if (!text) return;
+  await updateStepText(stepId, text);
+}
+
+async function removeStepFromModal(stepId) {
+  const taskId = document.getElementById('task-id').value;
+  await deleteStep(stepId);
+  renderStepsEditor(taskId);
+  const parentId = document.getElementById('task-depends').value;
+  if (parentId) populateStepSelector(parentId, document.getElementById('task-depends-step').value);
 }
 
 function closeTaskModal() {
@@ -679,6 +960,13 @@ async function saveTask(event) {
   const shift = document.getElementById('task-shift').value;
   const task_time = document.getElementById('task-time');
   const enabled = document.getElementById('task-enabled').checked;
+  const depends_on = document.getElementById('task-depends').value || null;
+  const depends_on_step = document.getElementById('task-depends-step').value || null;
+
+  if (depends_on_step && !depends_on) {
+    showToast('Para depender de un paso debes elegir una tarea madre', 'error');
+    return;
+  }
 
   const days = [];
   document.querySelectorAll('.day-checkbox input:checked').forEach(cb => {
@@ -690,7 +978,12 @@ async function saveTask(event) {
     return;
   }
 
-  const taskData = { title, description, shift, task_time: task_time.value, days, enabled };
+  if (depends_on === id) {
+    showToast('Una tarea no puede depender de si misma', 'error');
+    return;
+  }
+
+  const taskData = { title, description, shift, task_time: task_time.value, days, enabled, depends_on, depends_on_step };
 
   if (id) {
     await updateTask(id, taskData);

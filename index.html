@@ -203,6 +203,33 @@
         </div>
 
         <div class="form-group">
+          <label for="task-depends">Depende de (opcional)</label>
+          <div class="depends-row">
+            <select id="task-depends" onchange="updateStepSelector()">
+              <option value="">— Ninguna —</option>
+            </select>
+          </div>
+          <div class="depends-step-wrap" id="depends-step-wrap" style="display:none">
+            <label for="task-depends-step">Liberar en el paso:</label>
+            <select id="task-depends-step">
+              <option value="">— Al terminar la madre —</option>
+            </select>
+          </div>
+          <p class="form-hint">"Al terminar la madre" = libera cuando la madre se marca como hecha. Elegir un paso libera cuando ese paso se marca como hecho.</p>
+        </div>
+
+        <div class="form-group">
+          <label>Pasos de esta tarea</label>
+          <div id="steps-editor">
+            <p class="form-hint" id="steps-empty-hint">Esta tarea no tiene pasos. Agrega pasos si quieres que otras tareas dependan de puntos especificos.</p>
+          </div>
+          <div class="steps-add-row">
+            <input type="text" id="new-step-input" placeholder="Agregar un paso..." maxlength="120">
+            <button type="button" class="btn-small" onclick="addStepFromModal()">+ Agregar</button>
+          </div>
+        </div>
+
+        <div class="form-group">
           <label class="toggle-label">
             <input type="checkbox" id="task-enabled" checked>
             <span class="toggle-switch"></span>

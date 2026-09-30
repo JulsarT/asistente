@@ -925,16 +925,13 @@ function populateStepSelector(parentId, selectedStep) {
 
 function renderStepsEditor(taskId) {
   const container = document.getElementById('steps-editor');
-  const hint = document.getElementById('steps-empty-hint');
   const taskSteps = taskId ? getStepsForTask(taskId) : [];
 
   if (taskSteps.length === 0) {
-    hint.style.display = 'block';
-    container.textContent = '';
+    container.innerHTML = '<p class="form-hint">Esta tarea no tiene pasos. Agrega pasos si quieres que otras tareas dependan de puntos especificos.</p>';
     return;
   }
 
-  hint.style.display = 'none';
   container.innerHTML = taskSteps.map(s => `
     <div class="modal-step-item">
       <span class="modal-step-num">${s.position + 1}</span>
@@ -1098,6 +1095,17 @@ function copyToClipboard(text) {
     navigator.clipboard.writeText(text).catch(() => {});
   }
 }
+
+window.addEventListener('error', (e) => {
+  console.error('Error no capturado:', e.error || e.message);
+  if (document.getElementById('toast-container')) {
+    showToast('Error: ' + (e.message || 'desconocido'), 'error');
+  }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('Promesa rechazada:', e.reason);
+});
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {

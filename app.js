@@ -128,6 +128,27 @@ function formatTime(timeStr) {
   return timeStr.substring(0, 5);
 }
 
+// Minutos en linea de tiempo continua del turno.
+// Turno noche: 22:00 -> 23:59 -> 00:00 (1440) -> 05:59 (1799)
+function getTimelineMinutes(timeStr, shift) {
+  const [h, m] = timeStr.split(':').map(Number);
+  let total = h * 60 + m;
+  if (shift === 'noche' && h < 12) total += 24 * 60;
+  return total;
+}
+
+function getTaskTimelineMinutes(task) {
+  return getTimelineMinutes(task.task_time, task.shift);
+}
+
+function getCurrentTimelineMinutes() {
+  const now = new Date();
+  return getTimelineMinutes(
+    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    getCurrentShift()
+  );
+}
+
 // ============================================
 // BASE DE DATOS
 // ============================================
@@ -359,10 +380,10 @@ function updateDashboard() {
   const todayTasks = tasks.filter(t => t.enabled && t.days.includes(today));
   document.getElementById('stat-enabled').textContent = todayTasks.length;
 
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const currentTimeline = getCurrentTimelineMinutes();
   const nextTask = todayTasks
-    .filter(t => t.task_time.substring(0, 5) > currentTime)
-    .sort((a, b) => a.task_time.localeCompare(b.task_time))[0];
+    .filter(t => getTaskTimelineMinutes(t) > currentTimeline)
+    .sort((a, b) => getTaskTimelineMinutes(a) - getTaskTimelineMinutes(b))[0];
 
   document.getElementById('stat-next').textContent = nextTask ? formatTime(nextTask.task_time) : '--:--';
 
@@ -398,7 +419,7 @@ function renderTasks() {
     if (groups[t.shift]) groups[t.shift].push(t);
   });
 
-  Object.values(groups).forEach(g => g.sort((a, b) => a.task_time.localeCompare(b.task_time)));
+  Object.values(groups).forEach(g => g.sort((a, b) => getTaskTimelineMinutes(a) - getTaskTimelineMinutes(b)));
 
   const shiftLabels = { manana: 'Mañana', tarde: 'Tarde', noche: 'Noche' };
   let html = '';
@@ -710,11 +731,20 @@ function markDismissed(taskId) {
 // ============================================
 // SONIDO
 // ============================================
-function enableAudio() {
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioContext.state === 'suspended') {
-    audioContext.resume();
+function ensureAudioContext() {
+  if (!audioContext) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    audioContext = new AC();
   }
+  if (audioContext.state === 'suspended') {
+    audioContext.resume().catch(() => {});
+  }
+  return true;
+}
+
+function enableAudio() {
+  if (!ensureAudioContext()) return;
   soundEnabled = true;
   document.getElementById('btn-sound').textContent = '🔊';
   document.getElementById('btn-enable-sound').style.display = 'none';
@@ -737,14 +767,16 @@ function setVolume(val) {
 }
 
 function playTestSound() {
-  if (!audioContext || !soundEnabled) return;
+  if (!soundEnabled) return;
+  if (!ensureAudioContext()) return;
   const t = audioContext.currentTime;
   playBeep(t, 880, 0.1, volume * 0.3);
   playBeep(t + 0.15, 880, 0.1, volume * 0.3);
 }
 
 function playAlarmSound() {
-  if (!audioContext || !soundEnabled) return;
+  if (!soundEnabled) return;
+  if (!ensureAudioContext()) return;
 
   const t = audioContext.currentTime;
 
@@ -777,9 +809,8 @@ function playBeep(time, frequency, duration, vol) {
 }
 
 function stopAlarmSound() {
-  if (audioContext) {
-    audioContext.close().catch(() => {});
-    audioContext = null;
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume().catch(() => {});
   }
 }
 

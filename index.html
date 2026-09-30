@@ -133,9 +133,10 @@
   <!-- ============================================ -->
   <!-- MODAL: ALARMA                                -->
   <!-- ============================================ -->
-  <div class="alarm-overlay" id="alarm-overlay" style="display:none">
+  <div class="alarm-overlay" id="alarm-overlay" style="display:none" onclick="if (event.target === this) dismissAlarm()">
     <div class="alarm-modal">
       <div class="alarm-pulse"></div>
+      <button class="btn-alarm-close" onclick="dismissAlarm()" title="Cerrar">&times;</button>
       <div class="alarm-icon">🔔</div>
       <h2 id="alarm-title">TAREA</h2>
       <p id="alarm-description" class="alarm-desc"></p>

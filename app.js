@@ -547,7 +547,11 @@ function renderReminders() {
 // ============================================
 function checkAlarms() {
   const now = new Date();
-  const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  const currentShift = getCurrentShift();
+  const currentTimelineSeconds = getTimelineMinutes(
+    `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+    currentShift
+  ) * 60 + now.getSeconds();
   const today = getDayName(now);
   const todayKey = now.toISOString().split('T')[0];
 
@@ -562,9 +566,8 @@ function checkAlarms() {
     // Si la tarea esta bloqueada por dependencia (madre o paso), no suena
     if (isTaskBlocked(task)) return;
 
-    const [h, m] = task.task_time.split(':').map(Number);
-    const taskSeconds = h * 3600 + m * 60;
-    const diff = taskSeconds - currentSeconds;
+    const taskSeconds = getTimelineMinutes(task.task_time, task.shift) * 60;
+    const diff = taskSeconds - currentTimelineSeconds;
 
     if (diff >= 0 && diff <= 15) {
       triggerAlarm(task);

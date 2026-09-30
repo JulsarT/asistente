@@ -876,6 +876,25 @@ body {
   animation: shake 0.5s infinite;
 }
 
+.btn-alarm-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+  transition: color var(--transition);
+  z-index: 2;
+}
+
+.btn-alarm-close:hover {
+  color: var(--accent-red);
+}
+
 @keyframes shake {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(15deg); }
@@ -1163,6 +1182,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  pointer-events: none;
 }
 
 .toast {

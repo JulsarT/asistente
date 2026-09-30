@@ -151,7 +151,7 @@
   <!-- ============================================ -->
   <!-- MODAL: AGREGAR/EDITAR TAREA                  -->
   <!-- ============================================ -->
-  <div class="modal-overlay" id="task-modal" style="display:none">
+  <div class="modal-overlay" id="task-modal" style="display:none" onclick="if (event.target === this) closeTaskModal()">
     <div class="modal">
       <div class="modal-header">
         <h2 id="modal-title">Nueva Tarea</h2>
@@ -247,7 +247,7 @@
   <!-- ============================================ -->
   <!-- MODAL: CONFIRMAR ELIMINAR                    -->
   <!-- ============================================ -->
-  <div class="modal-overlay" id="delete-modal" style="display:none">
+  <div class="modal-overlay" id="delete-modal" style="display:none" onclick="if (event.target === this) closeDeleteModal()">
     <div class="modal modal-small">
       <div class="modal-header">
         <h2>Eliminar Tarea</h2>

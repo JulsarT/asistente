@@ -842,59 +842,66 @@ function setFilter(filter) {
 // ============================================
 function openTaskModal(taskId) {
   const modal = document.getElementById('task-modal');
-  const form = document.getElementById('task-form');
-  form.reset();
-
-  const currentTaskId = taskId || '';
-  document.getElementById('task-id').value = currentTaskId;
-  document.getElementById('task-enabled').checked = true;
-
-  document.querySelectorAll('.day-checkbox input').forEach(cb => cb.checked = true);
-
-  // Poblar lista de dependencias (excluye la tarea misma)
-  const dependsSelect = document.getElementById('task-depends');
-  dependsSelect.innerHTML = '<option value="">— Ninguna —</option>';
-  tasks
-    .filter(t => t.id !== currentTaskId)
-    .forEach(t => {
-      const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = `${formatTime(t.task_time)} - ${t.title}`;
-      dependsSelect.appendChild(opt);
-    });
-
-  // Ocultar selector de paso hasta que elijan madre
-  document.getElementById('depends-step-wrap').style.display = 'none';
-  document.getElementById('task-depends-step').innerHTML = '<option value="">— Al terminar la madre —</option>';
-
-  if (taskId) {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      document.getElementById('modal-title').textContent = 'Editar Tarea';
-      document.getElementById('task-id').value = task.id;
-      document.getElementById('task-title').value = task.title;
-      document.getElementById('task-desc').value = task.description || '';
-      document.getElementById('task-shift').value = task.shift;
-      document.getElementById('task-time').value = task.task_time.substring(0, 5);
-      document.getElementById('task-enabled').checked = task.enabled;
-      document.getElementById('task-depends').value = task.depends_on || '';
-      document.getElementById('task-depends-step').value = task.depends_on_step || '';
-
-      if (task.depends_on) {
-        document.getElementById('depends-step-wrap').style.display = 'block';
-        populateStepSelector(task.depends_on, task.depends_on_step);
-      }
-
-      document.querySelectorAll('.day-checkbox input').forEach(cb => {
-        cb.checked = task.days.includes(cb.value);
-      });
-    }
-  } else {
-    document.getElementById('modal-title').textContent = 'Nueva Tarea';
-  }
-
-  renderStepsEditor(currentTaskId);
   modal.style.display = 'flex';
+
+  try {
+    const form = document.getElementById('task-form');
+    form.reset();
+
+    const currentTaskId = taskId || '';
+    document.getElementById('task-id').value = currentTaskId;
+    document.getElementById('task-enabled').checked = true;
+
+    document.querySelectorAll('.day-checkbox input').forEach(cb => cb.checked = true);
+
+    // Poblar lista de dependencias (excluye la tarea misma)
+    const dependsSelect = document.getElementById('task-depends');
+    dependsSelect.innerHTML = '<option value="">— Ninguna —</option>';
+    tasks
+      .filter(t => t.id !== currentTaskId)
+      .forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = `${formatTime(t.task_time)} - ${t.title}`;
+        dependsSelect.appendChild(opt);
+      });
+
+    // Ocultar selector de paso hasta que elijan madre
+    document.getElementById('depends-step-wrap').style.display = 'none';
+    document.getElementById('task-depends-step').innerHTML = '<option value="">— Al terminar la madre —</option>';
+
+    if (taskId) {
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        document.getElementById('modal-title').textContent = 'Editar Tarea';
+        document.getElementById('task-id').value = task.id;
+        document.getElementById('task-title').value = task.title;
+        document.getElementById('task-desc').value = task.description || '';
+        document.getElementById('task-shift').value = task.shift;
+        document.getElementById('task-time').value = task.task_time.substring(0, 5);
+        document.getElementById('task-enabled').checked = task.enabled;
+        document.getElementById('task-depends').value = task.depends_on || '';
+        document.getElementById('task-depends-step').value = task.depends_on_step || '';
+
+        if (task.depends_on) {
+          document.getElementById('depends-step-wrap').style.display = 'block';
+          populateStepSelector(task.depends_on, task.depends_on_step);
+        }
+
+        document.querySelectorAll('.day-checkbox input').forEach(cb => {
+          cb.checked = task.days.includes(cb.value);
+        });
+      }
+    } else {
+      document.getElementById('modal-title').textContent = 'Nueva Tarea';
+    }
+
+    renderStepsEditor(currentTaskId);
+  } catch (err) {
+    console.error('Error abriendo modal:', err);
+    document.getElementById('modal-title').textContent = 'Error: ' + err.message;
+    showToast('Error al abrir modal: ' + err.message, 'error');
+  }
 }
 
 function updateStepSelector() {
